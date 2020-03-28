@@ -1,0 +1,52 @@
+addpath('C:/Users/Michael Nickerson/Documents/IPL/Code/Lumerical/common');  # LABDESK
+addpath('/home/nickersonm/lumerical/common');   # Cluster
+addpath('E:/Nickerson/Lumerical/common');   # LABSIM
+
+### Get user-set variables
+#
+## Output products:
+#   definedScalar:  list of defined scalars
+#   definedString:  list of defined strings
+#   definedStruct:  list of defined non-scalar non-string variables (matrix, struct, cell)
+
+
+## Initialize
+definedScalar = ''; definedString = ''; definedStruct = ''; definedVars = '';
+
+
+## Calculate derived parameters
+vList = splitstring(workspace, endl);
+
+for (i=1:length(vList)) {
+    # Record strings
+    if (findstring(vList{i}, 'Strings') > 0) {
+        definedString = replacestring(vList{i+1}, ' ', ',');
+    }
+    
+    # Record scalars and matrices
+    if (findstring(vList{i}, 'Matrices') > 0) {
+        definedVars = replacestring(vList{i+1}, ' ', ',');
+    }
+    
+    # The only cell list that is relevant
+    if (findstring(vList{i}, 'layerNames') > 0) {
+        definedStruct = definedStruct + 'layerNames,';
+    }
+}
+
+# Split matrices
+definedVars = splitstring(definedVars, ',');
+for (i=1:length(definedVars)) {
+    if (length(definedVars{i}) > 0) {
+        eval('val='+definedVars{i}+';');
+        if (size(val) > 1) {
+            definedStruct = definedStruct + definedVars{i} + ',';
+        } else {
+            definedScalar = definedScalar + definedVars{i} + ',';
+        }
+    }
+}
+
+
+## Cleanup
+clear(i, definedVars, vList);

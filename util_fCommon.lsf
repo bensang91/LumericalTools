@@ -1,0 +1,53 @@
+### Common helper function definitions
+
+## Determine which IDE we're operating in by looking for known command
+#   Returns '1' if this is the FDE IDE, '0' if this is DEVICE
+function isFDE() {
+    return (findstring(getcommands, "addeme\n") > 0);
+}
+function isDEVICE() {
+    return ~isFDE();
+}
+
+
+## General cumulative sum function, sums down columns
+function cumsum(v) {
+    s = matrix(size(v,1),size(v,2));
+    for (i=1:size(v,1)) {
+        s(i,:) = sum(v(1:i,:),1);
+    }
+    return s;
+}
+
+
+## Select geometry; create if doesn't exist (e.g. in MODE)
+function selectGeom() {
+    if (getnamednumber('::model::geometry') < 1) {
+        select('::model');
+        addgroup; set('name', 'geometry');
+    }
+    select("::model::geometry");
+    return '::model::geometry';
+}
+
+
+## Matrix subtraction
+function msub(m1, m2) {
+    if (size(m1,2) == size(m2,2)) {
+        j = 2;
+    } else if (size(m1,1) == size(m2,1)) {
+        j = 1;
+    } else {
+        ?'msub: No dimensions match!'; break;
+    }
+    
+    for ( i=1:size(m1, j) ) {
+        if (j==2) {
+            m1(:,i) = m1(:,i) - m2(:,i);
+        } else if (j==1) {
+            m1(i,:) = m1(i,:) - m2(i,:);
+        }
+    }
+    
+    return m1;
+}

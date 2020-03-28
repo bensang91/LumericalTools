@@ -1,0 +1,33 @@
+### Get nonscalar parameters via user parameters
+## To be run in a setup or analysis script
+## Searches all available strings for `toscript`-passed items
+
+# Set target if not specified
+if (~exist('target')) { target = '::model'; }
+
+# Get all variables
+vList = splitstring(workspace, endl);
+vStr = 0;
+
+# Extract list of strings
+for (i=1:length(vList)) {
+    if (findstring(vList{i}, 'Strings') > 0) {
+        vStr = splitstring(vList{i+1}, ' ');
+    }
+}
+
+# Evaluate strings beginning with '!!'
+if (iscell(vStr)) {
+    for (i=1:length(vStr)) {
+        if (findstring(getnamed(target), vStr{i}) > 0 & length(vStr{i}) > 1) {
+            if (findstring(getnamed(target, vStr{i}), '#evalme') == 1) {
+                eval(getnamed(target, vStr{i}));    # Recover value
+                # eval(vStr{i} + ' = val;');          # Move to variable name
+            }
+        }
+    }
+}
+
+
+## Cleanup
+clear(i, vStr, vList);
