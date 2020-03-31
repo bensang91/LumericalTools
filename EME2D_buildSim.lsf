@@ -1,0 +1,256 @@
+addpath('C:/Users/Michael Nickerson/Documents/IPL/Code/Lumerical/common');  # LABDESK
+addpath('/home/nickersonm/lumerical/common');   # Cluster
+addpath('E:/Nickerson/Lumerical/common');   # LABSIM
+util_fCommon;    # Load common functions
+
+### Build a 2D plan-view EME design
+## Units: um lengths, cm^-1 loss, 1e18 cm^-3 doping
+## Inputs as defined variables:
+# Required:
+#   none
+# Optional:
+#   inMode:     [y,Ez] input TM mode profile, default fundamental TM mode
+#   inRot:      input port rotation around z axis in degrees, default 0
+#   wgDef:      if present, will add cells for each waveguide x-extent
+#   simCenter:  [x,y] center of simulation, default center of geometric extent
+#   simX:       longitudinal simulation span, default enclosing geometric extent
+#   simY:       transverse simulation span, default enclosing geometric extent
+#   simZ:       transverse simulation span, default 1um
+#   simBuffer:  buffers for mesh, etc, default 0.5um
+#   simPML:     number of mesh-periods for PML border, default 16
+#   simModes:   number of modes to search; linearly impacts memory, default 500
+#   simRes:     mesh size in normal regions [um], can be matrix of [res,yMin,yMax,[xMin,xMax]]; default 0.1
+#   simCellLen: list of simulation supercell x-extents, can be [xMin,xMax] matrix; auto-generated if wgDef present
+#   simCellRes: size of simulation cells, can be vector corresponding to simCellLen; default 5um
+#   simCellN:   number of simulation cells, can be vector corresponding to simCellLen; overwrites simCellRes
+
+
+
+### Set defaults if needed
+simVars = 'inRot,simZ,simBuffer,simPML,simModes,simRes,simCellRes';
+dVals = '0,1,0.5,16,500,0.1,5';
+dVars = simVars; dRequired = '';
+util_paramDefaults;
+
+um = 1e-6;
+lambda = 1.03;  # Hardcoded for now
+
+
+## Derived parameters
+# Find maximum extent of geometry
+rMin = [0,0]; rMax = [0,0];
+selectpartial(selectGeom() + "::");
+for (i = 1:getnumber()) {
+    vtx = get('vertices', i);
+    rMin(1) = min([rMin(1); vtx(:,1)]);
+    rMin(2) = min([rMin(2); vtx(:,2)]);
+    rMax(1) = max([rMax(1); vtx(:,1)]);
+    rMax(2) = max([rMax(2); vtx(:,2)]);
+}
+rMin = rMin/um; rMax = rMax/um;
+if ( ~exist('simX') ) { simX = rMax(1)-rMin(1); }
+if ( ~exist('simY') ) { simY = rMax(2)-rMin(2); }
+if ( ~exist('simCenter') ) { simCenter = rMin/2 + rMax/2; }
+
+# Contrary to the manual, mesh size = min(global, override)
+#   So here we assign resGlobal = max(all res) and set override everywhere else
+if (size(simRes,1) > 1) {
+    resGlobal = max(simRes(:,1));
+} else {
+    resGlobal = simRes;
+}
+
+# Add xMin, xMax to simRes if needed
+if ( (size(simRes,2) > 2) & (size(simRes,2) < 5) ) {
+    simRes = [simRes, zeros(size(simRes,1),1), ones(size(simRes,1),1) * simX];
+}
+
+# Build cell groups if needed and possible
+if (~exist('simCellLen')) {
+    simCellLen = [0,simX];
+    if ( exist('wgDef') ) {
+        for ( i=1:length(wgDef)) {
+            simCellLen = [simCellLen; wgDef{i}.start(1), wgDef{i}.end(1)];
+        }
+        # TODO: auto-generate simCellN based on waveguide slope?
+    } else {
+        simCellLen = simX;
+    }
+}
+
+# Normalize simCellLen to list of non-overlapping lengths if in [xMin,xMax] format
+if ( size(simCellLen,2) < length(simCellLen) ) {
+    cellStart = simCellLen(:,1); cellEnd = simCellLen(:,2);
+    
+    # Change to unique cell start locations
+    simCellLen = unique(cellStart);
+    
+    # Convert to length by finding the next-closest end
+    for (i = 1:length(simCellLen)) {
+        simCellLen(i) = min(cellEnd(find(cellStart == simCellLen(i) ))) - simCellLen(i);
+    }
+    
+    # Convert to size because we're reshaping potentially overlapping regions
+    if ( exist('simCellN') ) {
+        simCellRes = (cellEnd - cellStart) / simCellN;
+    }
+    
+    # Address simCellN or simCellRes if specified
+    simCellN = ones(size(simCellLen,1));
+    if ( length(simCellRes) > 1 ) {
+        simCellN(1) = ceil(simCellLen(1) / 
+                            min( simCellRes( find(
+                                (cellStart >= 0) & (cellEnd <= simCellLen(1))
+                                )) ) );
+        for ( i=2:length(simCellLen) ) {
+            simCellN(i) = ceil(simCellLen(i) / 
+                            min( simCellRes( find(
+                                (cellStart >= sum(simCellLen(1:i-1))) & (cellEnd <= sum(simCellLen(1:i)))
+                                )) ) );
+        }
+    } else { simCellN = ceil(simCellLen/simCellRes); }
+    
+    clear(cellStart, cellEnd);
+}
+
+# Use simCellN instead of simCellRes
+if (~exist('simCellN')) {
+    simCellN = ceil(simCellLen/simCellRes);
+}
+
+# Remove zero-extent groups
+simRes = simRes(find( (simRes(:,3)-simRes(:,2))*(simRes(:,5)-simRes(:,4)) ~= 0),:);
+simCellN = simCellN(find(simCellLen ~= 0));
+simCellLen = simCellLen(find(simCellLen ~= 0));
+
+
+
+### Function definitions
+# Add a mesh rectangle
+function addMeshRect(group, name, res, yMin, yMax, xMin, xMax, zSpan) {
+    addmesh; set("name", name); set("z", 0); set("z span", zSpan*1e-6);
+    set("y max", max([yMin, yMax]*1e-6)); set("y min", min([yMin, yMax]*1e-6));
+    set("x max", max([xMin, xMax]*1e-6)); set("x min", min([xMin, xMax]*1e-6));
+    set("override x mesh", 0); set("override z mesh", 0);
+    set("dy", res*1e-6);
+    addtogroup(group);
+}
+
+
+
+### Add mesh constraints
+geoGroup = selectGeom();
+addgroup; set("name", 'waveguideMesh'); set("x", 0); set("y", 0); set("z", 0);
+addtogroup(geoGroup);
+geoGroup = geoGroup + '::waveguideMesh';
+
+# Just iterate through mesh list
+for (i=1:size(simRes, 1)) {
+    if (simRes(i,1) ~= resGlobal) {
+        addMeshRect(geoGroup, 'mesh'+num2str(i), simRes(i, 1), 
+                    min(simRes(i, 2:3))-simBuffer, max(simRes(i, 2:3))+simBuffer, 
+                    min(simRes(i, 4:5))-simBuffer, max(simRes(i, 4:5))+simBuffer, simZ);
+    }
+}
+
+
+
+### Add simulation
+# Add solver if it doesn't exist; using try to work inside setup scripts
+solver = ""; try { solver = getactivesolver; } catch(errMsg);
+if (solver ~= "EME") { select("::model"); try{addeme;} catch(errMsg); }
+solver = "::model::EME";
+
+# Cell properties
+setnamed(solver, 'number of cell groups', length(simCellLen));
+setnamed(solver, 'group spans', simCellLen*um);
+setnamed(solver, 'cells', simCellN);
+setnamed(solver, 'subcell method', 1 + 0*simCellLen);
+setnamed(solver, 'display cells', 1);
+
+
+## Main solver
+# Solver properties
+setnamed(solver, "wavelength", lambda*um);
+setnamed(solver, "solver type", "2D XY plane: X prop");
+setnamed(solver, "define y mesh by", "maximum mesh step"); setnamed(solver, "dy", resGlobal*um); 
+
+# Simulation boundaries
+setnamed(solver, "x", simCenter(1)*um); setnamed(solver, "y", simCenter(2)*um); setnamed(solver, "z", 0);
+setnamed(solver, "y span", (simY - (simPML*resGlobal + simBuffer))*um);    # Slightly inset from edges
+
+# Boundary conditions
+setnamed(solver, "y min bc", "PML"); setnamed(solver, "y max bc", "PML");
+setnamed(solver, "pml layers", simPML);
+
+# Calculation parameters
+setnamed(solver, "number of modes for all cell groups", simModes);
+setnamed(solver, "max stored modes", simModes * 2 );
+
+
+
+### Modify ports
+## Input port
+port = solver+'::Ports::port_1';
+# Basic settings
+setnamed(port, 'z span', simZ*um);
+setnamed(port, 'theta', inRot);
+setnamed(port, 'mode selection', 'fundamental TM mode');
+# setnamed(port, 'number of trial modes', simModes/2);
+
+# Mode profile: calculate if needed
+if (exist('inMode')) {
+    if ( size(inMode) > [2,1] ) {
+        # Generate dataset with specified profile
+        Ez = inMode(:,2);
+        Hy = sqrt(eps0/mu0)*Ez;
+        EM = rectilineardataset("EM fields",[0],inMode(:,1)*um,[0]);
+        EM.addparameter("lambda",lambda*um,"f",c/(lambda*um));
+        EM.addattribute("E",0*Ez,0*Ez,Ez);
+        EM.addattribute("H",0*Ez,sqrt(eps0/mu0)*Ez,0*Ez);
+        
+        # Select and import dataset
+        setnamed(port, 'mode selection', 'user import');
+        select(port);
+        importdataset(EM);
+    }
+}
+
+
+## Output port
+port = solver+'::Ports::port_2';
+# Basic settings
+setnamed(port, 'z span', simZ*um);
+setnamed(port, 'mode selection', 'fundamental TM mode');
+# setnamed(port, 'number of trial modes', simModes/2);
+
+
+
+### Monitors: in-plane
+select(solver);
+addemeprofile;
+set('name', 'planarField'); mon = 'planarField';
+setnamed(mon, 'monitor type', '2D Z-normal');
+setnamed(mon, 'use relative coordinates', 0);
+setnamed(mon, "x", simCenter(1)*um); setnamed(mon, "y", simCenter(2)*um); setnamed(mon, "z", 0);
+setnamed(mon, "y span", (simY - (simPML*resGlobal + simBuffer))*um);    # Slightly inset from edges
+setnamed(mon, 'x span', simX*um);
+
+
+
+### Set general EME analysis properties
+setemeanalysis('override max modes', 1);
+setemeanalysis('max modes', simModes);
+
+
+
+### Cleanup temporary variables
+errMsg = ''; Ez = 0; Hy = 0; EM = 0;
+clear(solver, rMax, rMin, errMsg, port, Ez, Hy, EM, mon, geoGroup);
+
+
+# ## Save all variables
+# # Pass resultant variables to analysis script
+# util_paramGetDefined;
+# passVars = definedScalar + definedString + definedStruct;
+# util_paramPass;       # Run pass function

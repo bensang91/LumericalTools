@@ -1,0 +1,101 @@
+addpath('C:/Users/Michael Nickerson/Documents/IPL/Code/Lumerical/common');  # LABDESK
+addpath('/home/nickersonm/lumerical/common');   # Cluster
+addpath('E:/Nickerson/Lumerical/common');   # LABSIM
+util_fCommon;    # Load common functions
+
+### Definitions
+## Units: um lengths, cm^-1 loss, 1e18 cm^-3 doping
+## Required variables
+# Required:
+#   matN:       vector of complex indicies
+#   wgDef:      cell list of waveguides, each element being a structure with fields:
+#       .material:  material that exists in project, presumably set by EME2D_buildMaterial
+#       .width:     width of the waveguide, unused if .start is specified
+#       .length:    length of the waveguide, unused if .end is specified
+#     Optional wgDef fields:
+#       .start:     [x0,y0,w0] start location and width, default prev.end or [0,0,width]
+#       .end:       [x1,y1,w1] end location and width, default start+[length,0,0]
+#       .name:      name for the waveguide object, default 'wg#'
+#       .res:       minimum y-resolution for this waveguide; will generate simRes matrix, can be [res,yMin,yMax,xMin,xMax]
+#       .cells      number of cells for this waveguide; will generate simCells and simCellLen matrix
+#
+## Optional variables
+#   matNames:   cell list or comma-separated string of names for materials; otherwise generated as 'EME_nk#'
+#   inMode:     [y,Ez] input TM mode profile, default fundamental TM mode
+#   inRot:      input port rotation around z axis in degrees, default 0
+#   simCenter:  [x,y] center of simulation, default center of geometric extent
+#   simX:       longitudinal simulation span, default enclosing geometric extent
+#   simY:       transverse simulation span, default enclosing geometric extent
+#   simZ:       transverse simulation span, default 1um
+#   simBuffer:  buffers for etch, mesh, etc, default 0.1um
+#   simPML:     number of mesh-periods for PML border, default 16
+#   simModes:   number of modes to search; linearly impacts memory, default 500
+#   simRes:     mesh size in normal regions [um], can be matrix of [res,yMin,yMax,[xMin,xMax]]; default 0.1
+#   simCellLen: list of simulation supercell x-extents, can be [xMin,xMax] matrix; auto-generated if wgDef present
+#   simCellRes: size of simulation cells, can be vector corresponding to simCellLen; default 5um
+#   simCellN:   number of simulation cells, can be vector corresponding to simCellLen; overwrites simCellRes
+#   savName:    string name or descriptor for the simulation, no spaces, defaults to project filename
+
+
+
+### New waveguide simulation
+# For some reason this must be called twice, or stuff hangs around
+clear; newproject;
+clear; newproject;
+
+
+## Set customizations
+# Basic parameters
+savName = 'D23_EMEtest';
+simPML = 8;
+
+# Effective indicies from first fab
+matN = [3.45295+3.03936e-06i, 3.44557+2.21133e-06i, 1];
+matNames = 'Ridge,Etch,Air';
+
+# Waveguides
+# Note that since 2019bR4 these can be defned more compactly than this
+wgDef = cell(3);
+
+wgDef{1} = struct;
+wgDef{1}.name="Etch";
+wgDef{1}.material = "Etch";
+wgDef{1}.width=100;
+wgDef{1}.length=200;
+wgDef{1}.res=5;
+
+wgDef{2} = struct;
+wgDef{2}.name="InputTaper";
+wgDef{2}.material = "Ridge";
+wgDef{2}.start=[0,0,10];
+wgDef{2}.end=[100,0,1.2];
+wgDef{2}.res=0.25;
+wgDef{2}.cells=20;
+
+wgDef{3} = struct;
+wgDef{3}.name="Straight";
+wgDef{3}.material = "Ridge";
+# wgDef{3}.start=[100,0,1.2];
+wgDef{3}.length=100;
+wgDef{3}.res=0.25;
+wgDef{3}.cells=3;
+
+
+## Initialize
+switchtolayout;
+select('::model'); deleteall;
+
+
+## Build
+EME2D_buildMaterial;
+EME2D_buildWGs;
+EME2D_buildSim;
+
+# Zooom extents
+selectGeom(); setview('extent');
+select('EME'); setview('extent');
+
+## Save self
+cd(filedirectory(currentscriptname));
+save(replacestring(savName, '.', ''));
+

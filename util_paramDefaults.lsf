@@ -7,22 +7,22 @@
 # Clean inputs
 dVars = replacestring(dVars, ' ', '');
 dVals = replacestring(dVals, ' ', '');
-if (exist(dRequired)) { dRequired = replacestring(dRequired, ' ', ''); }
+if (exist('dRequired')) { dRequired = replacestring(dRequired, ' ', ''); }
 
 # Change to cell
 dVars = splitstring(dVars, ',');
 dVals = splitstring(dVals, ',');
-if (exist(dRequired)) { dRequired = splitstring(dRequired, ','); }
+if (exist('dRequired')) { dRequired = splitstring(dRequired, ','); }
 
 # Verify input
-if (length(dVars) ~= length(dVals)) { print('Error: number of values does not match number of variables!'); break; }
+if (length(dVars) ~= length(dVals)) { ?('Error: number of values does not match number of variables!'); break; }
 
 # Check for required variables
 if (exist('dRequired')) {
     if (iscell(dRequired)) {
         for (i=1:length(dRequired)) {
-            if (~exist(dRequired{i})) {
-                print('Error: required variable "' + dRequired{i} + '" not present!');
+            if (~exist(dRequired{i}) & (dRequired{i} ~= '' )) {
+                ?('Error: required variable "' + dRequired{i} + '" not present!');
                 break;
             }
         }

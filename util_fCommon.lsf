@@ -20,6 +20,16 @@ function cumsum(v) {
 }
 
 
+## Find x in cell array C
+function findcell(x, C) {
+    if ( ~iscell(C) ) { ?('"findcell" not passed a cell!'); break; }
+    for (i=1:length(C)) {
+        if (x == C{i}) { return i; }
+    }
+    return 0;
+}
+
+
 ## Select geometry; create if doesn't exist (e.g. in MODE)
 function selectGeom() {
     if (getnamednumber('::model::geometry') < 1) {
@@ -51,3 +61,23 @@ function msub(m1, m2) {
     
     return m1;
 }
+
+
+## Raised Sine s-curve
+# K. L. Kruse and C. T. Middlebrook, https://doi.org/10/ggp757
+function sCurveRaisedSine(xv, dY) {
+    dX = max(xv) - min(xv);
+    return (dY/dX)*xv - (dY/(2*pi))*sin(2*pi*xv/dX);
+}
+# Derivative, analytical
+function dRaisedSine(xv, dY) {
+    dX = max(xv) - min(xv);
+    return 2*dY*sin(pi*xv/dX)^2/dX;
+}
+# Curvature, via analytical y''/(1+y'^2)^3/2
+function kRaisedSine(xv, dY) {
+    dX = max(xv) - min(xv);
+    z = sin(2*pi*xv/dX);
+    return 2*dX*pi*z / (dX^2 + 4*dY^2*z^4)^1.5;
+}
+
