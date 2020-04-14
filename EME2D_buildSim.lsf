@@ -18,7 +18,7 @@ util_fCommon;    # Load common functions
 #   simZ:       transverse simulation span, default 1um
 #   simBuffer:  buffers for mesh, etc, default 0.5um
 #   simPML:     number of mesh-periods for PML border, default 16
-#   simModes:   number of modes to search; linearly impacts memory, default 500
+#   simModes:   number of modes to search; linearly impacts memory, default 200
 #   simRes:     mesh size in normal regions [um], can be matrix of [res,yMin,yMax,[xMin,xMax]]; default 0.1
 #   simCellLen: list of simulation supercell x-extents, can be [xMin,xMax] matrix; auto-generated if wgDef present
 #   simCellRes: size of simulation cells, can be vector corresponding to simCellLen; default 5um
@@ -27,13 +27,17 @@ util_fCommon;    # Load common functions
 
 
 ### Set defaults if needed
-simVars = 'inRot,simZ,simBuffer,simPML,simModes,simRes,simCellRes';
-dVals = '0,1,0.5,16,500,0.1,5';
+simVars = 'inRot,simZ,simBuffer,simPML,simModes';
+dVals = '0,1,0.5,16,200';
 dVars = simVars; dRequired = '';
 util_paramDefaults;
 
 um = 1e-6;
 lambda = 1.03;  # Hardcoded for now
+
+# Defaults that optionally have more complex passing; required here to avoid complexity in structure simulation
+if ( ~exist('simRes') ) { simRes = 0.1; }
+if ( ~exist('simCellRes') ) { simCellRes = 5; }
 
 
 ## Derived parameters
@@ -65,6 +69,12 @@ if ( (size(simRes,2) > 2) & (size(simRes,2) < 5) ) {
     simRes = [simRes, zeros(size(simRes,1),1), ones(size(simRes,1),1) * simX];
 }
 
+# Remove NaNs (nan ~= nan)
+simRes = simRes(find( prod(simRes==simRes,2) ~= 0), :);
+
+# Remove zero-extent groups
+simRes = simRes(find( (simRes(:,3)-simRes(:,2))*(simRes(:,5)-simRes(:,4)) ~= 0),:);
+
 # Build cell groups if needed and possible
 if (~exist('simCellLen')) {
     simCellLen = [0,simX];
@@ -79,7 +89,15 @@ if (~exist('simCellLen')) {
 }
 
 # Normalize simCellLen to list of non-overlapping lengths if in [xMin,xMax] format
-if ( size(simCellLen,2) < length(simCellLen) ) {
+if ( min(size(simCellLen)) < length(simCellLen) ) {
+    # Remove zero-extent groups
+    if ( exist('simCellN') ) {
+        if ( length(simCellN) > 1 ) {
+            simCellN = simCellN(find(simCellLen(:,1) ~= simCellLen(:,2)));
+        }
+    }
+    simCellLen = simCellLen(find(simCellLen(:,1) ~= simCellLen(:,2)),:);
+    
     cellStart = simCellLen(:,1); cellEnd = simCellLen(:,2);
     
     # Change to unique cell start locations
@@ -118,10 +136,6 @@ if (~exist('simCellN')) {
     simCellN = ceil(simCellLen/simCellRes);
 }
 
-# Remove zero-extent groups
-simRes = simRes(find( (simRes(:,3)-simRes(:,2))*(simRes(:,5)-simRes(:,4)) ~= 0),:);
-simCellN = simCellN(find(simCellLen ~= 0));
-simCellLen = simCellLen(find(simCellLen ~= 0));
 
 
 
@@ -176,7 +190,8 @@ setnamed(solver, "solver type", "2D XY plane: X prop");
 setnamed(solver, "define y mesh by", "maximum mesh step"); setnamed(solver, "dy", resGlobal*um); 
 
 # Simulation boundaries
-setnamed(solver, "x", simCenter(1)*um); setnamed(solver, "y", simCenter(2)*um); setnamed(solver, "z", 0);
+setnamed(solver, "x min", rMin(1)*um);
+setnamed(solver, "y", simCenter(2)*um); setnamed(solver, "z", 0);
 setnamed(solver, "y span", (simY - (simPML*resGlobal + simBuffer))*um);    # Slightly inset from edges
 
 # Boundary conditions
@@ -194,20 +209,23 @@ setnamed(solver, "max stored modes", simModes * 2 );
 port = solver+'::Ports::port_1';
 # Basic settings
 setnamed(port, 'z span', simZ*um);
-setnamed(port, 'theta', inRot);
 setnamed(port, 'mode selection', 'fundamental TM mode');
 # setnamed(port, 'number of trial modes', simModes/2);
 
 # Mode profile: calculate if needed
 if (exist('inMode')) {
     if ( size(inMode) > [2,1] ) {
+        # Apply rotation
+        th = inRot*2*pi/360;
+        dPhi = 2*pi*inY*sin(th)/1.03;
+        inMode(:,2) = inMode(:,2) * ( cos(dPhi) + 1i*sin(dPhi) );
+        
         # Generate dataset with specified profile
         Ez = inMode(:,2);
-        Hy = sqrt(eps0/mu0)*Ez;
         EM = rectilineardataset("EM fields",[0],inMode(:,1)*um,[0]);
         EM.addparameter("lambda",lambda*um,"f",c/(lambda*um));
         EM.addattribute("E",0*Ez,0*Ez,Ez);
-        EM.addattribute("H",0*Ez,sqrt(eps0/mu0)*Ez,0*Ez);
+        EM.addattribute("H",-sqrt(eps0/mu0)*Ez*sin(th),sqrt(eps0/mu0)*Ez*cos(th),0*Ez);
         
         # Select and import dataset
         setnamed(port, 'mode selection', 'user import');
@@ -215,6 +233,7 @@ if (exist('inMode')) {
         importdataset(EM);
     }
 }
+
 
 
 ## Output port
@@ -238,19 +257,6 @@ setnamed(mon, 'x span', simX*um);
 
 
 
-### Set general EME analysis properties
-setemeanalysis('override max modes', 1);
-setemeanalysis('max modes', simModes);
-
-
-
 ### Cleanup temporary variables
 errMsg = ''; Ez = 0; Hy = 0; EM = 0;
-clear(solver, rMax, rMin, errMsg, port, Ez, Hy, EM, mon, geoGroup);
-
-
-# ## Save all variables
-# # Pass resultant variables to analysis script
-# util_paramGetDefined;
-# passVars = definedScalar + definedString + definedStruct;
-# util_paramPass;       # Run pass function
+clear(i, vtx, solver, rMax, rMin, errMsg, port, Ez, Hy, EM, mon, geoGroup);

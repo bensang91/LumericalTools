@@ -1,0 +1,131 @@
+addpath('C:/Users/Michael Nickerson/Documents/IPL/Code/Lumerical/common');  # LABDESK
+addpath('/home/nickersonm/lumerical/common');   # Cluster
+addpath('E:/Nickerson/Lumerical/common');   # LABSIM
+
+### Analyze simulation results
+## Units: um lengths, cm^-1 loss, 1e18 cm^-3 doping
+## Inputs as defined variables:
+# Optional:
+#   xSweep:         sweep specified cell x-dimension, [cell, X0, X1, N]
+#   lambdaSweep:    sweep wavelength, [lambda0, lambda1, N]
+#   modeSweep:      mode convergence sweep, [start, interval]
+#   monFile:        filename to export monitor data to
+#
+## Output products:
+#   S12:            S12 propagation parameter
+#   S11:            S11 propagation parameter
+#   P12:            abs(S12)^2
+#   sweepX:         only if xSweep specified, matrix of swept [x-span, s12, s11]
+#   sweepLambda:    only if lambdaSweep specified, matrix of [wavelength, s12, s11]
+#   sweepMode:      only if modeSweep specified, matrix of [modes, s12, s11]
+
+
+
+### Set defaults if needed
+um = 1e-6;
+
+
+
+### Function definitions
+
+
+#### Most of this is in a 'try' block so it can be used in the analysis script - must assume 'emepropagate' is externally called first!
+try {
+### Execute EME calculation - a separate step!
+## Set general EME analysis properties
+setemeanalysis('override max modes', 1);
+setemeanalysis('max modes', getnamed("::model::EME", "number of modes for all cell groups"));
+
+
+## Propagate
+emepropagate;
+
+
+## Run optional sweeps
+# Propagation sweep
+if ( exist('xSweep') ) {
+    if (size(xSweep) >= 4) {
+        # Set up xSweep
+        setemeanalysis('propagation sweep', 1);
+        
+        setemeanalysis('parameter', 'group span ' + num2str(xSweep(1)));
+        setemeanalysis('start', xSweep(2)*um);
+        setemeanalysis('stop', xSweep(3)*um);
+        setemeanalysis('number of points', round(xSweep(4)));
+        
+        # Execute xSweep
+        emesweep('propagation sweep');
+    }
+}
+
+# Wavelength sweep
+if ( exist('lambdaSweep') ) {
+    if (size(xSweep) >= 4) {
+        # Set up lambdaSweep
+        setemeanalysis('wavelength sweep', 1);
+        
+        setemeanalysis('start wavelength', lambdaSweep(1));
+        setemeanalysis('stop wavelength', lambdaSweep(2));
+        setemeanalysis('number of wavelength points', round(lambdaSweep(3)));
+        
+        # Execute xSweep
+        emesweep('wavelength sweep');
+    }
+}
+
+# Mode sweep
+if ( exist('modeSweep') ) {
+    if (size(xSweep) >= 4) {
+        # Set up modeSweep
+        setemeanalysis('mode convergence sweep', 1);
+        
+        setemeanalysis('start mode', modeSweep(1));
+        setemeanalysis('mode interval', modeSweep(2));
+        
+        # Execute xSweep
+        emesweep('mode convergence sweep');
+    }
+}
+} catch(errMsg);
+
+
+### Analysis (collect results)
+## General results
+S = getresult('EME', 'user s matrix');
+S12 = S(1,2);
+S11 = S(1,1);
+P12 = abs(S12)^2;
+
+
+## Export monitor if desired
+if ( exist('monFile') ) {
+    planarField = getresult('planarField', 'field profile');
+    matlabsave(monFile, planarField);
+}
+
+
+try{
+## Optional sweep results
+# Propagation sweep
+if ( exist('xSweep') ) {
+    S = getemesweep('S');
+    sweepX = [getparameter(S, getparameter(S)), S.s12, S.s11];
+}
+
+# Wavelength sweep
+if ( exist('lambdaSweep') ) {
+    S = getemesweep('S_wavelength_sweep');
+    sweepLambda = [getparameter(S, getparameter(S)), S.s12, S.s11];
+}
+
+# Mode sweep
+if ( exist('modeSweep') ) {
+    S = getemesweep('S_mode_convergence_sweep');
+    sweepMode = [getparameter(S, getparameter(S)), S.s12, S.s11];
+}
+} catch(errMsg);
+
+
+## Cleanup
+errMsg = '';
+clear(S, errMsg);

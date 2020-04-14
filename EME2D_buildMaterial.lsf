@@ -53,9 +53,19 @@ if ( length(matNames) < length(matN) ) {
 wgShade = linspace(0.9, 0.1, length(matN));
 ## Iterate through index list
 for ( i = (1:length(matN)) ) {
-    if ( ~materialexists(matNames{i}) ) {
-        setmaterial(addmaterial("(n,k) Material"), "name", matNames{i} );
-    }
+    # Add or update material; try {} for use in construction groups
+    #   since addmaterial and materialexists is not in scope
+    try {
+        if ( materialexists(matNames{i}) ) { 
+            # Delete if not the right kind of material
+            if (findstring(getmaterial(matNames{i}, 'type'), '(n,k)') < 1) {
+                deletematerial(matNames{i});
+                setmaterial(addmaterial("(n,k) Material"), "name", matNames{i});
+            }
+        } else {
+            setmaterial(addmaterial("(n,k) Material"), "name", matNames{i});
+        }
+    } catch(errMsg);
     setmaterial(matNames{i}, "Refractive Index", real(matN(i)));
     setmaterial(matNames{i}, "Imaginary Refractive Index", imag(matN(i)) );
     setmaterial(matNames{i}, 'color', [wgShade(i), wgShade(i), wgShade(i), 1-wgShade(i)]);
@@ -64,4 +74,5 @@ for ( i = (1:length(matN)) ) {
 
 
 ## Cleanup temporary variables
-clear(i, wgShade);
+errMsg = '';
+clear(i, wgShade, errMsg);

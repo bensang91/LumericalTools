@@ -81,8 +81,6 @@ for ( i = 1:length(wgDef) ) {
         if ( ~isfield(wg, 'name') ) { wg.name = 'wg'+num2str(i); }
         if ( ~isfield(wg, 'material') ) {
             ?('Error: waveguide "'+wg.name+'" has no material defined!'); break;
-        } else if ( ~materialexists(wg.material) ) {
-            ?('Error: waveguide "'+wg.name+'" requires material "'+wg.material+'" defined!'); break;
         }
         
         # Potentially optional fields; generate if not defined, error if not possible
@@ -103,6 +101,8 @@ for ( i = 1:length(wgDef) ) {
                 ?('Error: waveguide "'+wg.name+'" has no length defined!');
                 break;
             } else { wg.end = wg.start + [wg.length,0,0]; }
+        } else {
+            wg.length = wg.end(1) - wg.start(1);
         }
         
         # Calculate waveguide
@@ -110,13 +110,14 @@ for ( i = 1:length(wgDef) ) {
         wgPoly = wgPolyPoints(wg.start - r0, wg.end - r0, 200);
         
         
-        ## Add the waveguide and set the properties
-        selectGeom(); addpoly; addtogroup(geoGroup);
-        set('name', wg.name);
-        set('x', wg.start(1)*um); set('y', wg.start(2)*um); set('z', 0); set('z span', um);
-        set('material', wg.material);
-        set('vertices', wgPoly*um);
-        
+        ## Add the waveguide and set the properties if not vanishingly small
+        if ( wg.length > 0 ) {
+            selectGeom(); addpoly; addtogroup(geoGroup);
+            set('name', wg.name);
+            set('x', wg.start(1)*um); set('y', wg.start(2)*um); set('z', 0); set('z span', um);
+            set('material', wg.material);
+            set('vertices', wgPoly*um);
+        }
         
         # Add to simRes if .res specified
         if ( isfield(wg, 'res') ) {
@@ -153,5 +154,13 @@ for ( i = 1:length(wgDef) ) {
 }
 
 
+## Remove zero-span waveguides from definition
+empty = zeros(length(wgDef),1);
+for ( i = 1:length(wgDef) ) {
+    empty(i) = ~(wgDef{i}.length > 0);
+}
+wgDef = wgDef{find(~empty)};
+
+
 ## Cleanup temporary variables
-clear(wg, geoGroup, r0, wgPoly);
+clear(i, wg, geoGroup, r0, wgPoly);

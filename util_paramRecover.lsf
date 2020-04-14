@@ -16,7 +16,7 @@ for (i=1:length(vList)) {
     }
 }
 
-# Evaluate strings beginning with '!!'
+# Evaluate strings beginning with '#evalme'
 if (iscell(vStr)) {
     for (i=1:length(vStr)) {
         if (findstring(getnamed(target), vStr{i}) > 0 & length(vStr{i}) > 1) {
