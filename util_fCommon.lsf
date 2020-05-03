@@ -81,3 +81,8 @@ function kRaisedSine(xv, dY) {
     return 2*dX*pi*z / (dX^2 + 4*dY^2*z^4)^1.5;
 }
 
+
+## Normalize a matrix
+function normalize(v) {
+    return v/max(v);
+}

@@ -10,14 +10,16 @@ util_fCommon;    # Load common functions
 #   none
 # Optional:
 #   inMode:     [y,Ez] input TM mode profile, default fundamental TM mode
-#   inRot:      input port rotation around z axis in degrees, default 0
+#   inRot:      input mode rotation around z axis in degrees, default 0
+#   outMode:    [y,Ez] output TM mode profile, default fundamental TM mode
+#   outRot:     output mode rotation around z axis in degrees, default 0
 #   wgDef:      if present, will add cells for each waveguide x-extent
 #   simCenter:  [x,y] center of simulation, default center of geometric extent
 #   simX:       longitudinal simulation span, default enclosing geometric extent
 #   simY:       transverse simulation span, default enclosing geometric extent
 #   simZ:       transverse simulation span, default 1um
 #   simBuffer:  buffers for mesh, etc, default 0.5um
-#   simPML:     number of mesh-periods for PML border, default 16
+#   simPML:     number of mesh-periods for PML border, default 8
 #   simModes:   number of modes to search; linearly impacts memory, default 200
 #   simRes:     mesh size in normal regions [um], can be matrix of [res,yMin,yMax,[xMin,xMax]]; default 0.1
 #   simCellLen: list of simulation supercell x-extents, can be [xMin,xMax] matrix; auto-generated if wgDef present
@@ -27,8 +29,8 @@ util_fCommon;    # Load common functions
 
 
 ### Set defaults if needed
-simVars = 'inRot,simZ,simBuffer,simPML,simModes';
-dVals = '0,1,0.5,16,200';
+simVars = 'inRot,outRot,simZ,simBuffer,simPML,simModes';
+dVals = '0,0,1,0.5,8,200';
 dVars = simVars; dRequired = '';
 util_paramDefaults;
 
@@ -44,8 +46,8 @@ if ( ~exist('simCellRes') ) { simCellRes = 5; }
 # Find maximum extent of geometry
 rMin = [0,0]; rMax = [0,0];
 selectpartial(selectGeom() + "::");
-for (i = 1:getnumber()) {
-    vtx = get('vertices', i);
+for (i = 1:(getnumber()-1)) {   # last is the 'waveguideMesh' group
+    vtx = msub( get('vertices', i), -[get('x', i), get('y', i)] );
     rMin(1) = min([rMin(1); vtx(:,1)]);
     rMin(2) = min([rMin(2); vtx(:,2)]);
     rMax(1) = max([rMax(1); vtx(:,1)]);
@@ -54,7 +56,7 @@ for (i = 1:getnumber()) {
 rMin = rMin/um; rMax = rMax/um;
 if ( ~exist('simX') ) { simX = rMax(1)-rMin(1); }
 if ( ~exist('simY') ) { simY = rMax(2)-rMin(2); }
-if ( ~exist('simCenter') ) { simCenter = rMin/2 + rMax/2; }
+if ( ~exist('simCenter') ) { simCenter = (rMin + rMax)/2; }
 
 # Contrary to the manual, mesh size = min(global, override)
 #   So here we assign resGlobal = max(all res) and set override everywhere else
@@ -73,7 +75,9 @@ if ( (size(simRes,2) > 2) & (size(simRes,2) < 5) ) {
 simRes = simRes(find( prod(simRes==simRes,2) ~= 0), :);
 
 # Remove zero-extent groups
-simRes = simRes(find( (simRes(:,3)-simRes(:,2))*(simRes(:,5)-simRes(:,4)) ~= 0),:);
+if ( size(simRes,2) >= 5) {
+    simRes = simRes(find( (simRes(:,3)-simRes(:,2))*(simRes(:,5)-simRes(:,4)) ~= 0),:);
+}
 
 # Build cell groups if needed and possible
 if (~exist('simCellLen')) {
@@ -98,44 +102,39 @@ if ( min(size(simCellLen)) < length(simCellLen) ) {
     }
     simCellLen = simCellLen(find(simCellLen(:,1) ~= simCellLen(:,2)),:);
     
-    cellStart = simCellLen(:,1); cellEnd = simCellLen(:,2);
+    # Calculate unique cell boundaries
+    cellBoundaries = unique(simCellLen(:));
     
-    # Change to unique cell start locations
-    simCellLen = unique(cellStart);
+    # Change simCellLen to actual list of lengths
+    simCells = simCellLen;
+    simCellLen = simCells(:,2) - simCells(:,1);
     
-    # Convert to length by finding the next-closest end
-    for (i = 1:length(simCellLen)) {
-        simCellLen(i) = min(cellEnd(find(cellStart == simCellLen(i) ))) - simCellLen(i);
-    }
-    
-    # Convert to size because we're reshaping potentially overlapping regions
+    # Convert cell number to size because we're reshaping potentially overlapping regions
     if ( exist('simCellN') ) {
-        simCellRes = (cellEnd - cellStart) / simCellN;
+        simCellRes = simCellLen / simCellN;
     }
     
-    # Address simCellN or simCellRes if specified
+    # Create unique simCellLen
+    simCellLen = cellBoundaries(2:end) - cellBoundaries(1:(end-1));
+    
+    # Build appropriate simCellN for each unique cell boundary region
     simCellN = ones(size(simCellLen,1));
     if ( length(simCellRes) > 1 ) {
-        simCellN(1) = ceil(simCellLen(1) / 
-                            min( simCellRes( find(
-                                (cellStart >= 0) & (cellEnd <= simCellLen(1))
-                                )) ) );
-        for ( i=2:length(simCellLen) ) {
-            simCellN(i) = ceil(simCellLen(i) / 
-                            min( simCellRes( find(
-                                (cellStart >= sum(simCellLen(1:i-1))) & (cellEnd <= sum(simCellLen(1:i)))
-                                )) ) );
+        # Can vectorize this and nest more, but it's clearer in a loop
+        for ( i=1:(length(cellBoundaries)-1) ) {
+            overlapCells = find( (cellBoundaries(i) >= simCells(:,1)) & (cellBoundaries(i+1) <= simCells(:,2)) );
+            simCellN(i) = ceil(simCellLen(i) / min( simCellRes(overlapCells) ));
         }
+        clear(overlapCells);
     } else { simCellN = ceil(simCellLen/simCellRes); }
     
-    clear(cellStart, cellEnd);
+    clear(cellBoundaries);
 }
 
 # Use simCellN instead of simCellRes
 if (~exist('simCellN')) {
     simCellN = ceil(simCellLen/simCellRes);
 }
-
 
 
 
@@ -189,11 +188,6 @@ setnamed(solver, "wavelength", lambda*um);
 setnamed(solver, "solver type", "2D XY plane: X prop");
 setnamed(solver, "define y mesh by", "maximum mesh step"); setnamed(solver, "dy", resGlobal*um); 
 
-# Simulation boundaries
-setnamed(solver, "x min", rMin(1)*um);
-setnamed(solver, "y", simCenter(2)*um); setnamed(solver, "z", 0);
-setnamed(solver, "y span", (simY - (simPML*resGlobal + simBuffer))*um);    # Slightly inset from edges
-
 # Boundary conditions
 setnamed(solver, "y min bc", "PML"); setnamed(solver, "y max bc", "PML");
 setnamed(solver, "pml layers", simPML);
@@ -201,6 +195,12 @@ setnamed(solver, "pml layers", simPML);
 # Calculation parameters
 setnamed(solver, "number of modes for all cell groups", simModes);
 setnamed(solver, "max stored modes", simModes * 2 );
+
+# Simulation boundaries
+setnamed(solver, "z", 0);
+setnamed(solver, "y", simCenter(2)*um);
+setnamed(solver, "y span", (simY - (simPML*resGlobal + simBuffer))*um);    # Slightly inset from edges
+setnamed(solver, "x min", rMin(1)*um);
 
 
 
@@ -210,30 +210,33 @@ port = solver+'::Ports::port_1';
 # Basic settings
 setnamed(port, 'z span', simZ*um);
 setnamed(port, 'mode selection', 'fundamental TM mode');
-# setnamed(port, 'number of trial modes', simModes/2);
 
-# Mode profile: calculate if needed
+# Mode profile: build EM field if specified, [y, Ez]
 if (exist('inMode')) {
     if ( size(inMode) > [2,1] ) {
+        yv = inMode(:,1);
+        Ez = inMode(:,2);
+        
         # Apply rotation
         th = inRot*2*pi/360;
-        dPhi = 2*pi*inY*sin(th)/1.03;
-        inMode(:,2) = inMode(:,2) * ( cos(dPhi) + 1i*sin(dPhi) );
+        dPhi = 2*pi*yv*sin(th)/1.03;
+        Ez = Ez * ( cos(dPhi) + 1i*sin(dPhi) );
         
         # Generate dataset with specified profile
-        Ez = inMode(:,2);
-        EM = rectilineardataset("EM fields",[0],inMode(:,1)*um,[0]);
+        EM = rectilineardataset("EM fields",[0],yv*um,[0]);
         EM.addparameter("lambda",lambda*um,"f",c/(lambda*um));
         EM.addattribute("E",0*Ez,0*Ez,Ez);
-        EM.addattribute("H",-sqrt(eps0/mu0)*Ez*sin(th),sqrt(eps0/mu0)*Ez*cos(th),0*Ez);
+        EM.addattribute("H",sqrt(eps0/mu0)*Ez*sin(th),-sqrt(eps0/mu0)*Ez*cos(th),0*Ez);
         
         # Select and import dataset
         setnamed(port, 'mode selection', 'user import');
         select(port);
         importdataset(EM);
+        
+        # Cleanup
+        clear(Ez, yv);
     }
 }
-
 
 
 ## Output port
@@ -241,19 +244,64 @@ port = solver+'::Ports::port_2';
 # Basic settings
 setnamed(port, 'z span', simZ*um);
 setnamed(port, 'mode selection', 'fundamental TM mode');
-# setnamed(port, 'number of trial modes', simModes/2);
+
+# Mode profile: build EM field if specified, [y, Ez]
+if (exist('outMode')) {
+    if ( size(outMode) > [2,1] ) {
+        yv = outMode(:,1);
+        Ez = outMode(:,2);
+        
+        # Apply rotation
+        th = outRot*2*pi/360;
+        dPhi = 2*pi*yv*sin(th)/1.03;
+        Ez = Ez * ( cos(dPhi) + 1i*sin(dPhi) );
+        
+        # Generate dataset with specified profile
+        EM = rectilineardataset("EM fields",[0],yv*um,[0]);
+        EM.addparameter("lambda",lambda*um,"f",c/(lambda*um));
+        EM.addattribute("E",0*Ez,0*Ez,Ez);
+        EM.addattribute("H",sqrt(eps0/mu0)*Ez*sin(th),-sqrt(eps0/mu0)*Ez*cos(th),0*Ez);
+        
+        # Select and import dataset
+        setnamed(port, 'mode selection', 'user import');
+        select(port);
+        importdataset(EM);
+        
+        # Cleanup
+        clear(Ez, yv);
+    }
+}
 
 
 
-### Monitors: in-plane
-select(solver);
-addemeprofile;
+### Monitors
+## Simulation plane
+select(solver); addemeprofile;
 set('name', 'planarField'); mon = 'planarField';
 setnamed(mon, 'monitor type', '2D Z-normal');
 setnamed(mon, 'use relative coordinates', 0);
 setnamed(mon, "x", simCenter(1)*um); setnamed(mon, "y", simCenter(2)*um); setnamed(mon, "z", 0);
 setnamed(mon, "y span", (simY - (simPML*resGlobal + simBuffer))*um);    # Slightly inset from edges
 setnamed(mon, 'x span', simX*um);
+setnamed(mon, 'x resolution', 400);
+
+
+## Input and output fields
+# Input field
+select(solver); addemeprofile;
+set('name', 'inputField'); mon = 'inputField';
+setnamed(mon, 'monitor type', '2D X-normal');
+setnamed(mon, 'use relative coordinates', 0);
+setnamed(mon, "x", getnamed(solver, "x min") + 0.1*um); setnamed(mon, "y", simCenter(2)*um); setnamed(mon, "z", 0);
+setnamed(mon, "y span", (simY - (simPML*resGlobal + simBuffer))*um);    # Slightly inset from edges
+
+# Output field
+select(solver); addemeprofile;
+set('name', 'outputField'); mon = 'outputField';
+setnamed(mon, 'monitor type', '2D X-normal');
+setnamed(mon, 'use relative coordinates', 0);
+setnamed(mon, "x", getnamed(solver, "x min") + (simX-0.1)*um); setnamed(mon, "y", simCenter(2)*um); setnamed(mon, "z", 0);
+setnamed(mon, "y span", (simY - (simPML*resGlobal + simBuffer))*um);    # Slightly inset from edges
 
 
 

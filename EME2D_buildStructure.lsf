@@ -16,6 +16,7 @@ util_fCommon;    # Load common functions
 ## Set defaults if needed
 dVars = ''; dVals = ''; dRequired = 'contentScript';
 util_paramDefaults;
+if (~exist('customVars')) { customVars = ''; }
 
 
 ## Build structure content
@@ -61,7 +62,8 @@ deleteall;
 
 ## Pass relevant variables to structure definition
 # Pass default scalar and string values to be used as sweepable parameters
-passVars =  simVars;
+passVars =  simVars + ',' + customVars;
+?passVars;
 passTab = 'construction';
 util_paramPass;
 

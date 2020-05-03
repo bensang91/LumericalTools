@@ -27,6 +27,7 @@ if (exist('dRequired')) {
             }
         }
     }
+    clear(dRequired);
 }
 
 # Simply check for existence and set if not exist
@@ -38,4 +39,4 @@ for (i=1:length(dVars)) {
 
 
 ## Cleanup
-clear(i, dVars, dVals, dRequired);
+clear(i, dVars, dVals);
