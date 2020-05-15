@@ -1,11 +1,11 @@
 ### Define material parameters
-## Units: um lengths, cm^-1 loss, 1e18 cm^-3 doping
+## Units: µm lengths, cm^-1 loss, 1e18 cm^-3 doping
 
 ## Refractive Index
-# GaAs index from a 5-parameter Sellmeier fit to Gehrsitz 2000 at 300K; good above ~0.9um
+# GaAs index from a 5-parameter Sellmeier fit to Gehrsitz 2000 at 300K; good above ~0.9µm
 function nGaAs(lambda) { return 2.75 + 0.556*lambda^2/(lambda^2-0.261) + 0.0016*lambda^2/(lambda^2-0.7578); }
 
-# Al(x)Ga(1-x)As index for 1.03um, 300K from fit to Gehrsitz 2000; good to n ± 0.002
+# Al(x)Ga(1-x)As index for 1.03µm, 300K from fit to Gehrsitz 2000; good to n ± 0.002
 function nAlGaAs(x) { return nGaAs(1.03) - 0.733*x + 0.264*x^2 - 0.0906*x^3; }
 
 # Al(x)Ga(1-x)As index for below-gap wavelengths, 300K from fit to Gehrsitz 2000; good to n ± 0.01
@@ -19,9 +19,9 @@ function a_pAlGaAs(p, x) { y = log10(max([.001, p])); return 8.7 * 10^y * (1 + (
 
 
 ## Combination of the above, returning fully complex index
-# 1.03um and 300K; x = Al fraction, d = doping (p-positive, n-negative), e18
+# 1.03µm and 300K; x = Al fraction, d = doping (p-positive, n-negative), e18
 function nkAlGaAs(x, d) {
-    if (d>=0) {
+    if(d>=0) {
         k = a_nAlGaAs(d,x)*1.03*7.96e-6;
     } else {
         k = a_pAlGaAs(-d,x)*1.03*7.96e-6;

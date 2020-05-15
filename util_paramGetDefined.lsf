@@ -17,29 +17,29 @@ definedScalar = ''; definedString = ''; definedStruct = ''; definedVars = '';
 ## Calculate derived parameters
 vList = splitstring(workspace, endl);
 
-for (i=1:length(vList)) {
+for(i=1:length(vList)) {
     # Record strings
-    if (findstring(vList{i}, 'Strings') > 0) {
+    if(findstring(vList{i}, 'Strings') > 0) {
         definedString = replacestring(vList{i+1}, ' ', ',');
     }
     
     # Record scalars and matrices
-    if (findstring(vList{i}, 'Matrices') > 0) {
+    if(findstring(vList{i}, 'Matrices') > 0) {
         definedVars = replacestring(vList{i+1}, ' ', ',');
     }
     
     # The only cell list that is relevant
-    if (findstring(vList{i}, 'layerNames') > 0) {
+    if(findstring(vList{i}, 'layerNames') > 0) {
         definedStruct = definedStruct + 'layerNames,';
     }
 }
 
 # Split matrices
 definedVars = splitstring(definedVars, ',');
-for (i=1:length(definedVars)) {
-    if (length(definedVars{i}) > 0) {
+for(i=1:length(definedVars)) {
+    if(length(definedVars{i}) > 0) {
         eval('val='+definedVars{i}+';');
-        if (size(val) > 1) {
+        if(size(val) > 1) {
             definedStruct = definedStruct + definedVars{i} + ',';
         } else {
             definedScalar = definedScalar + definedVars{i} + ',';

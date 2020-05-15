@@ -22,7 +22,7 @@ val=0;
 
 ## Clean and type inputs
 # Clean input
-if (~iscell(passVars)) {
+if(~iscell(passVars)) {
         passVars = replacestring(passVars, ' ', ','); # Allow space-separated list
         passVars = replacestring(passVars, endl, ',');# Allow \n-separated list
         passVars = splitstring(passVars, ',');        # Make cell list
@@ -31,29 +31,29 @@ if (~iscell(passVars)) {
 
 ## Pass each variable as itself
 select(passTarget);
-for (i=1:length(passVars)) {
-    if (exist(passVars{i}) == 1) {
+for(i=1:length(passVars)) {
+    if(exist(passVars{i}) == 1) {
         # Type
         passType = 0;
         eval('val = ' + passVars{i} + ';');
         
         # String?
         try { val + ' '; } catch(errMsg);
-        if (length(errMsg) == 0) { passType = 1; }
+        if(length(errMsg) == 0) { passType = 1; }
         
         # Cell or nonscalar nonstring?  Convert to string and save via `toscript` with flag to convert
-        if ( (passType == 0) & (iscell(val) | length(val) > 1) ) {
+        if( (passType == 0) & (iscell(val) | length(val) > 1) ) {
             passType = 1;
             eval("val = '#evalme' + endl + toscript(" + passVars{i} + ");");
         }
         
         # If exist, update
         existVars = getnamed(passTarget) + endl;
-        if (findstring(existVars, passVars{i} + endl) > 0) {    # endl for whole word search
+        if(findstring(existVars, passVars{i} + endl) > 0) {    # endl for whole word search
             setnamed(passTarget, passVars{i}, val);
-        } else if (findstring(passTab, 'construction') > 0) {
+        } else if(findstring(passTab, 'construction') > 0) {
             adduserprop(passVars{i}, passType, val);
-        } else if (findstring(passTab, 'analysis') > 0) {
+        } else if(findstring(passTab, 'analysis') > 0) {
             addanalysisprop(passVars{i}, passType, val);
         }
     }

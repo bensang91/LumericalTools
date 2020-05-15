@@ -16,7 +16,7 @@ util_fCommon;    # Load common functions
 ## Set defaults if needed
 dVars = ''; dVals = ''; dRequired = 'contentScript';
 util_paramDefaults;
-if (~exist('customVars')) { customVars = ''; }
+if(~exist('customVars')) { customVars = ''; }
 
 
 ## Build structure content

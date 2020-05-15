@@ -4,7 +4,7 @@ addpath('E:/Nickerson/Lumerical/common');   # LABSIM
 util_fCommon;    # Load common functions
 
 ### Build constant-index materials for EME simulation
-## Units: um lengths, cm^-1 loss, 1e18 cm^-3 doping
+## Units: µm lengths, cm^-1 loss, 1e18 cm^-3 doping
 ## Inputs as defined variables:
 # Required:
 #   matN:       vector of complex indicies
@@ -21,28 +21,28 @@ dVals = ''; dVars = ''; dRequired = 'matN';
 util_paramDefaults;
 
 # Set vector defaults
-if ( length(matN) < 2 ) { matN = [matN, 1]; }  # Assume air for 2nd index if not specified
+if( length(matN) < 2 ) { matN = [matN, 1]; }  # Assume air for 2nd index if not specified
 
 
 ## Convert or genereate matNames
-if ( exist('matNames') ) {
+if( exist('matNames') ) {
     try { matNames + ' '; } catch(errMsg);  # Check if string
-    if (length(errMsg) == 0) {              # Convert from string
+    if(length(errMsg) == 0) {              # Convert from string
         matNames = splitstring(matNames, ',');
     }
-    if ( ~iscell(matNames) ) {
+    if( ~iscell(matNames) ) {
         ?('"matNames" specified incorrectly; using default EME_nk# names');
         clear(matNames);
     }
 }
-if ( ~exist('matNames') ) {
+if( ~exist('matNames') ) {
     matNames = cell(length(matN));
-    for ( i = 1:length(matN) ) {
+    for( i = 1:length(matN) ) {
         matNames{i} = 'EME_nk' + num2str(i);
     }
 }
-if ( length(matNames) < length(matN) ) {
-    for ( i = length(matNames):length(matN) ) {
+if( length(matNames) < length(matN) ) {
+    for( i = length(matNames):length(matN) ) {
         matNames{i} = 'EME_nk' + num2str(i);
      }
 }
@@ -52,13 +52,13 @@ if ( length(matNames) < length(matN) ) {
 ### Add materials
 wgShade = linspace(0.9, 0.1, length(matN));
 ## Iterate through index list
-for ( i = (1:length(matN)) ) {
+for( i = (1:length(matN)) ) {
     # Add or update material; try {} for use in construction groups
     #   since addmaterial and materialexists is not in scope
     try {
-        if ( materialexists(matNames{i}) ) { 
+        if( materialexists(matNames{i}) ) { 
             # Delete if not the right kind of material
-            if (findstring(getmaterial(matNames{i}, 'type'), '(n,k)') < 1) {
+            if(findstring(getmaterial(matNames{i}, 'type'), '(n,k)') < 1) {
                 deletematerial(matNames{i});
                 setmaterial(addmaterial("(n,k) Material"), "name", matNames{i});
             }

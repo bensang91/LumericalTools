@@ -7,21 +7,21 @@
 # Clean inputs
 dVars = replacestring(dVars, ' ', '');
 dVals = replacestring(dVals, ' ', '');
-if (exist('dRequired')) { dRequired = replacestring(dRequired, ' ', ''); }
+if(exist('dRequired')) { dRequired = replacestring(dRequired, ' ', ''); }
 
 # Change to cell
 dVars = splitstring(dVars, ',');
 dVals = splitstring(dVals, ',');
-if (exist('dRequired')) { dRequired = splitstring(dRequired, ','); }
+if(exist('dRequired')) { dRequired = splitstring(dRequired, ','); }
 
 # Verify input
-if (length(dVars) ~= length(dVals)) { ?('Error: number of values does not match number of variables!'); break; }
+if(length(dVars) ~= length(dVals)) { ?('Error: number of values does not match number of variables!'); break; }
 
 # Check for required variables
-if (exist('dRequired')) {
-    if (iscell(dRequired)) {
-        for (i=1:length(dRequired)) {
-            if (~exist(dRequired{i}) & (dRequired{i} ~= '' )) {
+if(exist('dRequired')) {
+    if(iscell(dRequired)) {
+        for(i=1:length(dRequired)) {
+            if(~exist(dRequired{i}) & (dRequired{i} ~= '' )) {
                 ?('Error: required variable "' + dRequired{i} + '" not present!');
                 break;
             }
@@ -31,8 +31,8 @@ if (exist('dRequired')) {
 }
 
 # Simply check for existence and set if not exist
-for (i=1:length(dVars)) {
-    if ( (exist(dVars{i}) ~= 1) & (length(dVars{i}) > 0) ) {
+for(i=1:length(dVars)) {
+    if( (exist(dVars{i}) ~= 1) & (length(dVars{i}) > 0) ) {
         eval(dVars{i}+'='+dVals{i}+';');
     }
 }

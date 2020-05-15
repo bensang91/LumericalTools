@@ -4,7 +4,7 @@ addpath('E:/Nickerson/Lumerical/common');   # LABSIM
 util_fCommon;
 
 ### Analyze simulation results
-## Units: um lengths, cm^-1 loss, 1e18 cm^-3 doping
+## Units: µm lengths, cm^-1 loss, 1e18 cm^-3 doping
 ## Inputs as defined variables:
 # Optional:
 #   xSweep:         sweep specified cell x-dimension, [cell, X0, X1, N]
@@ -44,8 +44,8 @@ emepropagate;
 
 ## Run optional sweeps
 # Propagation sweep
-if ( exist('xSweep') ) {
-    if (size(xSweep) >= 4) {
+if( exist('xSweep') ) {
+    if(size(xSweep) >= 4) {
         # Set up xSweep
         setemeanalysis('propagation sweep', 1);
         
@@ -60,8 +60,8 @@ if ( exist('xSweep') ) {
 }
 
 # Wavelength sweep
-if ( exist('lambdaSweep') ) {
-    if (size(xSweep) >= 4) {
+if( exist('lambdaSweep') ) {
+    if(size(xSweep) >= 4) {
         # Set up lambdaSweep
         setemeanalysis('wavelength sweep', 1);
         
@@ -75,8 +75,8 @@ if ( exist('lambdaSweep') ) {
 }
 
 # Mode sweep
-if ( exist('modeSweep') ) {
-    if (size(xSweep) >= 4) {
+if( exist('modeSweep') ) {
+    if(size(xSweep) >= 4) {
         # Set up modeSweep
         setemeanalysis('mode convergence sweep', 1);
         
@@ -100,7 +100,7 @@ S11 = S(1,1);
 ## Custom P12 calculation: modal overlap between outputField and port_2, scaled by total power transmission
 inputField = getresult('inputField', 'field profile');
 outputField = getresult('outputField', 'field profile');
-if ( findstring(getresult('EME::Ports::port_2'), 'fields') >= 0 ) {
+if( findstring(getresult('EME::Ports::port_2'), 'fields') >= 0 ) {
     outputMode = getresult('EME::Ports::port_2', 'fields');
 } else {
     outputMode = getresult('EME::Ports::port_2', 'mode profiles');
@@ -115,7 +115,7 @@ P12 = fieldOverlap(outputField, outputMode)*Ptr;
 
 
 ## Export monitor if desired
-if ( exist('monFile') ) {
+if( exist('monFile') ) {
     planarField = getresult('planarField', 'field profile');
     matlabsave(monFile, planarField);
 }
@@ -124,19 +124,19 @@ if ( exist('monFile') ) {
 try{
 ## Optional sweep results
 # Propagation sweep
-if ( exist('xSweep') ) {
+if( exist('xSweep') ) {
     S = getemesweep('S');
     sweepX = [getparameter(S, getparameter(S)), S.s12, S.s11];
 }
 
 # Wavelength sweep
-if ( exist('lambdaSweep') ) {
+if( exist('lambdaSweep') ) {
     S = getemesweep('S_wavelength_sweep');
     sweepLambda = [getparameter(S, getparameter(S)), S.s12, S.s11];
 }
 
 # Mode sweep
-if ( exist('modeSweep') ) {
+if( exist('modeSweep') ) {
     S = getemesweep('S_mode_convergence_sweep');
     sweepMode = [getparameter(S, getparameter(S)), S.s12, S.s11];
 }
