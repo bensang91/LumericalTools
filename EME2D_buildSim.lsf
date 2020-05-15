@@ -46,7 +46,7 @@ if ( ~exist('simCellRes') ) { simCellRes = 5; }
 # Find maximum extent of geometry
 rMin = [0,0]; rMax = [0,0];
 selectpartial(selectGeom() + "::");
-for (i = 1:(getnumber()-1)) {   # last is the 'waveguideMesh' group
+for (i = 1:(getnumber())) {
     vtx = msub( get('vertices', i), -[get('x', i), get('y', i)] );
     rMin(1) = min([rMin(1); vtx(:,1)]);
     rMin(2) = min([rMin(2); vtx(:,2)]);

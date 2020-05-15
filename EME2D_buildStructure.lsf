@@ -90,6 +90,9 @@ util_paramRecover;  # Recover passed complex parameters
 ## Analyze
 EME2D_analyze;
 
+# Optimization metric depends on reducing the length
+optMetric = 100*P12^2 / (100 + (lSSC)^0.5);
+
 ";
 
 
@@ -97,5 +100,6 @@ EME2D_analyze;
 setnamed('::model', 'analysis script', analysisScript);
 select('::model');
 addanalysisresult('S12');
-addanalysisresult('P12');
 addanalysisresult('S11');
+addanalysisresult('P12');
+addanalysisresult('Ptr');

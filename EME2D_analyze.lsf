@@ -1,6 +1,7 @@
 addpath('C:/Users/Michael Nickerson/Documents/IPL/Code/Lumerical/common');  # LABDESK
 addpath('/home/nickersonm/lumerical/common');   # Cluster
 addpath('E:/Nickerson/Lumerical/common');   # LABSIM
+util_fCommon;
 
 ### Analyze simulation results
 ## Units: um lengths, cm^-1 loss, 1e18 cm^-3 doping
@@ -90,11 +91,27 @@ if ( exist('modeSweep') ) {
 
 
 ### Analysis (collect results)
-## General results
+## EME-provided results
 S = getresult('EME', 'user s matrix');
 S12 = S(1,2);
 S11 = S(1,1);
-P12 = abs(S12)^2;
+
+
+## Custom P12 calculation: modal overlap between outputField and port_2, scaled by total power transmission
+inputField = getresult('inputField', 'field profile');
+outputField = getresult('outputField', 'field profile');
+if ( findstring(getresult('EME::Ports::port_2'), 'fields') >= 0 ) {
+    outputMode = getresult('EME::Ports::port_2', 'fields');
+} else {
+    outputMode = getresult('EME::Ports::port_2', 'mode profiles');
+    outputMode.addattribute('E', outputMode.E1);
+}
+
+Pin = sum(integrate2(abs(inputField.E)^2, 1:4, inputField.x, inputField.y, inputField.z, 1));
+Pout = sum(integrate2(abs(outputField.E)^2, 1:4, outputField.x, outputField.y, outputField.z, 1));
+
+Ptr = Pout/Pin;
+P12 = fieldOverlap(outputField, outputMode)*Ptr;
 
 
 ## Export monitor if desired
