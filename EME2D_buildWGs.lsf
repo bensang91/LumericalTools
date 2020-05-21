@@ -17,6 +17,8 @@ util_fCommon;    # Load common functions
 #       .name:      name for the waveguide object, default 'wg#'
 #       .res:       minimum y-resolution for this waveguide; will generate simRes matrix, can be [res,yMin,yMax,xMin,xMax]
 #       .cells      number of cells for this waveguide; will generate simCellLen and simCellN matrix
+#       .bend       bend radius for this waveguide; will generate simBend
+#       .sbend      maximum bend radius for an s-bend; will generate appropriate structure for an s-bend with .cells distinct segments
 
 
 
@@ -145,6 +147,27 @@ for( i = 1:length(wgDef) ) {
             } else {
                 simCellLen = [simCellLen; wg.start(1), wg.end(1)];
                 simCellN = [simCellN, wg.cells];
+            }
+        }
+        
+        # Generate S-curve if specified
+        if( isfield(wg, 'sbend') ) {
+            if( ~isfield(wg, 'cells') ) { wg.cells = 10; }  # Default cell number
+            
+            # Simply assign the bend radii to the known curvature of an s-bend with maximum dY for this length
+            bendX = linspace(wg.start(1), wg.end(1), wg.cells + 1);   # Not perfect, but okay
+            Wmax = (wg.length)^2*wg.sbend/(2*pi);
+            simBend = [bendX(1:(end-1)), bendX(2:end), kRaisedSine( bendX(2:end)-bendX(1), Wmax )];
+            
+            clear(bendX, Wmax);
+        }
+        
+        # Generate simBend if specified
+        if( isfield(wg, 'bend') ) {
+            if( ~exist('simBend') ) {
+                simBend = [wg.start(1), wg.end(1), wg.bend];
+            } else {
+                simBend = [simBend; wg.start(1), wg.end(1), wg.bend];
             }
         }
         

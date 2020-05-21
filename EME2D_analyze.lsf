@@ -104,7 +104,9 @@ if( findstring(getresult('EME::Ports::port_2'), 'fields') >= 0 ) {
     outputMode = getresult('EME::Ports::port_2', 'fields');
 } else {
     outputMode = getresult('EME::Ports::port_2', 'mode profiles');
-    outputMode.addattribute('E', outputMode.E1);
+    outFields=splitstring(outputMode.getattribute, endl);
+    outputMode.addattribute('E', outputMode.getattribute(outFields{1}));
+    clear(outFields);
 }
 
 Pin = sum(integrate2(abs(inputField.E)^2, 1:4, inputField.x, inputField.y, inputField.z, 1));

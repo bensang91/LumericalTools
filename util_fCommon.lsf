@@ -157,7 +157,7 @@ function dRaisedSine(xv, dY) {
     dX = max(xv) - min(xv);
     return 2*dY*sin(pi*xv/dX)^2/dX;
 }
-# Curvature, via analytical y''/(1+y'^2)^3/2
+# Geometric curvature, via analytical k = y''/(1+y'^2)^3/2
 function kRaisedSine(xv, dY) {
     dX = max(xv) - min(xv);
     z = sin(2*pi*xv/dX);

@@ -62,8 +62,7 @@ deleteall;
 
 ## Pass relevant variables to structure definition
 # Pass default scalar and string values to be used as sweepable parameters
-passVars =  simVars + ',' + customVars;
-?passVars;
+passVars = simVars + ',' + customVars;
 passTab = 'construction';
 util_paramPass;
 

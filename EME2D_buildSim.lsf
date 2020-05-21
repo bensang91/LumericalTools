@@ -104,9 +104,9 @@ if( exist('simBend') ) {
         simCellLen = [simCellLen(1:(end-1)), simCellLen(2:end)];
     }
     
-    # Insert bend radius groups and N=3 minimum cell number
+    # Insert bend radius groups and N=2 minimum cell number
     simCellLen = [simCellLen; simBend(:,1:2)];
-    simCellN = [simCellN(:); ones(size(simBend,1), 1)*3];
+    simCellN = [simCellN(:); ones(size(simBend,1), 1)*2];
 }
 
 # Normalize simCellLen to list of non-overlapping lengths if in [xMin,xMax] format
@@ -252,7 +252,7 @@ setnamed(solver, "x min", rMin(1)*um);
 if( exist('simBend') ) {
     setnamed(solver, 'allow custom eigensolver settings', 1);
     for( i=1:size(simBend,1) ) {
-        select( 'EME::Cells::cell_'+num2str(simBend(i,1),'%i') );
+        select( solver+'::Cells::cell_'+num2str(simBend(i,1),'%i') );
         seteigensolver( 'bent waveguide', 1 );
         seteigensolver( 'bend radius', simBend(i,2)*um );
     }
