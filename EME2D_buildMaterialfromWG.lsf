@@ -1,0 +1,72 @@
+addpath('C:/Users/Michael Nickerson/Documents/IPL/Code/Lumerical/common');  # LABDESK
+addpath('/home/nickersonm/lumerical/common');   # Cluster
+addpath('E:/Nickerson/Lumerical/common');   # LABSIM
+util_fCommon;    # Load common functions
+
+### Convert specified transverse design to 2D plan-view EME design
+## Units: µm lengths, cm^-1 loss, 1e18 cm^-3 doping
+## Inputs as defined variables:
+# Required:
+#   tSim:       transverse-view input simulation file with structure-based sim1D and sim1Detch bools
+# Optional:
+#   savName:    name to save as, default tSim + '_EME'
+#   simX:       longitudinal simulation span, default 100µm
+#   simY:       transverse simulation span, default 25µm
+#   simZ:       z-simulation span, thickness, default 1µm
+#   wgWidth:    waveguide width, default etchWidth from tSim
+#   simBR:      bend radius, 0 = unbent, default 0
+#   simModes:   number of modes to search; linearly impacts memory, default 50
+#   simRes:     mesh size [um], default 0.1
+
+
+
+### Set defaults if needed
+dVars = ''; dVals = ''; dRequired = 'tSim';
+util_paramDefaults;
+
+um=1e-6;
+
+# Generate new name if desired
+if(~exist(savName)) {
+    savName = filebasename(tSim) + '_EME';
+}
+
+
+### Extract relevant parameters from specified simulation file
+## Load and resave
+load(tSim);
+save(savName);
+constructionScript = getnamed('::model', 'setup script');
+breakN = findstring(constructionScript, '##Build Geometry') - 1;
+
+# Get wgWidth if needed
+if(~exist('wgWidth')) {
+    wgWidth = getnamed('::model', 'etchWidth');
+}
+
+
+## Waveguide effective index
+# In case the construction script is manually setting the sim1D variables, force insert before the end
+setnamed('::model', 'setup script', substring(constructionScript, 1, breakN) + 'sim1D = 1; sim1Detch = 0;' + substring(constructionScript, breakN));
+runsetup;
+
+# Run and analyze
+findmodes; runanalysis;
+nWaveguide = getdata("mode"+num2str(getresult('::model', 'anMode1')), "neff");
+
+
+## Slab effective index
+# In case the construction script is manually setting the sim1D variables, force insert before the end
+switchtolayout;
+setnamed('::model', 'setup script', substring(constructionScript, 1, breakN) + 'sim1D = 1; sim1Detch = 1;' + substring(constructionScript, breakN));
+runsetup;
+
+# Run and analyze
+findmodes; runanalysis;
+nSlab = getdata("mode"+num2str(getresult('::model', 'anMode1')), "neff");
+
+
+
+### Build new EME simulation
+newproject; save(savName);
+WG_buildEME;

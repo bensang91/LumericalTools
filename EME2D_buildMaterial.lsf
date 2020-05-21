@@ -1,0 +1,78 @@
+addpath('C:/Users/Michael Nickerson/Documents/IPL/Code/Lumerical/common');  # LABDESK
+addpath('/home/nickersonm/lumerical/common');   # Cluster
+addpath('E:/Nickerson/Lumerical/common');   # LABSIM
+util_fCommon;    # Load common functions
+
+### Build constant-index materials for EME simulation
+## Units: µm lengths, cm^-1 loss, 1e18 cm^-3 doping
+## Inputs as defined variables:
+# Required:
+#   matN:       vector of complex indicies
+# Optional:
+#   matNames:   cell list or comma-separated string of names for materials; otherwise generated as 'EME_nk#'
+#
+## Output products:
+#   matNames:   cell list of generated materials
+
+
+
+### Set defaults if needed
+dVals = ''; dVars = ''; dRequired = 'matN';
+util_paramDefaults;
+
+# Set vector defaults
+if( length(matN) < 2 ) { matN = [matN, 1]; }  # Assume air for 2nd index if not specified
+
+
+## Convert or genereate matNames
+if( exist('matNames') ) {
+    try { matNames + ' '; } catch(errMsg);  # Check if string
+    if(length(errMsg) == 0) {              # Convert from string
+        matNames = splitstring(matNames, ',');
+    }
+    if( ~iscell(matNames) ) {
+        ?('"matNames" specified incorrectly; using default EME_nk# names');
+        clear(matNames);
+    }
+}
+if( ~exist('matNames') ) {
+    matNames = cell(length(matN));
+    for( i = 1:length(matN) ) {
+        matNames{i} = 'EME_nk' + num2str(i);
+    }
+}
+if( length(matNames) < length(matN) ) {
+    for( i = length(matNames):length(matN) ) {
+        matNames{i} = 'EME_nk' + num2str(i);
+     }
+}
+
+
+
+### Add materials
+wgShade = linspace(0.9, 0.1, length(matN));
+## Iterate through index list
+for( i = (1:length(matN)) ) {
+    # Add or update material; try {} for use in construction groups
+    #   since addmaterial and materialexists is not in scope
+    try {
+        if( materialexists(matNames{i}) ) { 
+            # Delete if not the right kind of material
+            if(findstring(getmaterial(matNames{i}, 'type'), '(n,k)') < 1) {
+                deletematerial(matNames{i});
+                setmaterial(addmaterial("(n,k) Material"), "name", matNames{i});
+            }
+        } else {
+            setmaterial(addmaterial("(n,k) Material"), "name", matNames{i});
+        }
+    } catch(errMsg);
+    setmaterial(matNames{i}, "Refractive Index", real(matN(i)));
+    setmaterial(matNames{i}, "Imaginary Refractive Index", imag(matN(i)) );
+    setmaterial(matNames{i}, 'color', [wgShade(i), wgShade(i), wgShade(i), 1-wgShade(i)]);
+    setmaterial(matNames{i}, 'mesh order', i);
+}
+
+
+## Cleanup temporary variables
+errMsg = '';
+clear(i, wgShade, errMsg);

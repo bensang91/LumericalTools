@@ -1,0 +1,227 @@
+### Common helper function definitions
+
+## General cumulative sum function, sums down columns
+function cumsum(v) {
+    s = matrix(size(v,1),size(v,2));
+    for(i=1:size(v,1)) {
+        s(i,:) = sum(v(1:i,:),1);
+    }
+    return s;
+}
+
+
+## General dimension-finding function
+function dim(t) {
+    return length(size(t));
+}
+
+
+## Matrix subtraction
+function msub(m1, m2) {
+    if(size(m1,2) == size(m2,2)) {
+        j = 2;
+    } else if(size(m1,1) == size(m2,1)) {
+        j = 1;
+    } else {
+        ?'msub: No dimensions match!'; break;
+    }
+    
+    for( i=1:size(m1, j) ) {
+        if(j==2) {
+            m1(:,i) = m1(:,i) - m2(:,i);
+        } else if(j==1) {
+            m1(i,:) = m1(i,:) - m2(i,:);
+        }
+    }
+    
+    return m1;
+}
+
+
+## Normalize a matrix
+function normalize(v) {
+    return v/sum(v);
+}
+
+
+## Normalize a nonuniform matrix
+function normalizeX(v,x) {
+    return v/integrate2(v, 1:dim(v), x);
+}
+
+
+## Insert a singleton dimension into a matrix
+# d = dimension to insert singleton AFTER; can be vector
+function diminsert(m, d) {
+    # Recurse if vector specified
+    if(length(d)>1) {
+        # Iterate backwards to keep references correct
+        d = sort(d);
+        for( i=length(d):-1:1 ) {
+            m = diminsert(m, d(i));
+        }
+    } else {
+        # Insert new singleton dimension
+        mSize = size(m);
+        if( d==0 ) {
+            mSize = [1; mSize(:)];
+        } else if( d >= dim(m) ) {
+            mSize = [mSize(:); 1];
+        } else {
+            mSize = [mSize(1:d); 1; mSize((d+1):end)];
+        }
+        
+        # Generate new matrix and assign
+        mOld = m;
+        eval("m = matrix("+replacestring(num2str(mSize(:)), endl, ", ")+");");
+        m(:) = mOld(:);
+    }
+    
+    return m;
+}
+
+
+## Resize a dimension
+# d = dimension to change; can be vector
+# n = new dimensional size; can be vector
+function dimresize(m, d, n) {
+    # Recurse if vector specified
+    if( length(d) > 1 ) {
+        for( i = 1:length(d) ) {
+            m = dimresize(m, d(i), n(min([i,length(n)])) );
+        }
+    } else {
+        if( dim(m) < d ) { ?'dimresize: Invalid dimension specified!'; break; }
+        
+        # Generate new sizing and create
+        mSize = size(m); mSize(d) = n;
+        o = m; dO = min([size(m,d), n]);
+        eval("m = matrix("+replacestring(num2str(mSize(:)), endl, ", ")+");");
+        
+        # Copy data
+        validStr = '';
+        for(i = 1:dim(m) ) {
+            if( i == d ) {
+                validStr = validStr + "1:" + num2str(dO);
+            } else {
+                validStr = validStr + ":";
+            }
+            if( i ~= dim(m) ) { validStr = validStr + ","; }
+        }
+        eval("m("+validStr+") = o("+validStr+");");
+    }
+    
+    return m;
+}
+
+
+## Find x in cell array C
+function findcell(x, C) {
+    if( ~iscell(C) ) { ?('"findcell" not passed a cell!'); break; }
+    for( i=1:length(C) ) {
+        if(x == C{i}) { return i; }
+    }
+    return 0;
+}
+
+
+## Determine which IDE we're operating in by looking for known command
+#   Returns '1' if this is the FDE IDE, '0' if this is DEVICE
+function isFDE() {
+    return (findstring(getcommands, "addeme\n") > 0);
+}
+function isDEVICE() {
+    return ~isFDE();
+}
+
+
+## Select geometry; create if doesn't exist (e.g. in MODE)
+function selectGeom() {
+    if(getnamednumber('::model::geometry') < 1) {
+        select('::model');
+        addgroup; set('name', 'geometry');
+    }
+    select("::model::geometry");
+    return '::model::geometry';
+}
+
+
+## Raised Sine s-curve
+# K. L. Kruse and C. T. Middlebrook, https://doi.org/10/ggp757
+function sCurveRaisedSine(xv, dY) {
+    dX = max(xv) - min(xv);
+    return (dY/dX)*xv - (dY/(2*pi))*sin(2*pi*xv/dX);
+}
+# Derivative, analytical
+function dRaisedSine(xv, dY) {
+    dX = max(xv) - min(xv);
+    return 2*dY*sin(pi*xv/dX)^2/dX;
+}
+# Geometric curvature, via analytical k = y''/(1+y'^2)^3/2
+function kRaisedSine(xv, dY) {
+    dX = max(xv) - min(xv);
+    z = sin(2*pi*xv/dX);
+    return 2*dX*pi*z / (dX^2 + 4*dY^2*z^4)^1.5;
+}
+
+
+## Field overlap calculation
+# Returns field overlap integral of arbitrary input fields
+# Takes standard field input datastructures EM.{x,y,z} and EM.E
+function fieldOverlap(EM1, EM2) {
+    # Copy to local variables for manipulation
+    E1 = EM1.E; x1 = EM1.x; y1 = EM1.y; z1 = EM1.z;
+    E2 = EM2.E; x2 = EM2.x; y2 = EM2.y; z2 = EM1.z;
+    
+    # Drop potential frequency dimensions
+    if(dim(E1) > 4) { E1 = pinch(E1,4); }
+    if(dim(E2) > 4) { E2 = pinch(E2,4); }
+    
+    # Standardize input
+    E1 = pinch(E1); E2 = pinch(E2);
+    
+    # Make sure any singleton dimension is last, since we 'pinch'ed the field
+    if(length(x1) == 1) { x1 = y1; y1 = 0; }
+    if(length(y1) == 1) { y1 = z1; z1 = 0; }
+    if(length(x2) == 1) { x2 = y2; y2 = 0; }
+    if(length(y2) == 1) { y2 = z2; z2 = 0; }
+    
+    # Make 3-vector if not already
+    E1 = dimresize(E1, dim(E1), 3);
+    E2 = dimresize(E2, dim(E2), 3);
+    
+    # Expand to 4D matrix
+    for( 0; dim(E1) < 4; 0 ) { E1 = diminsert(E1, dim(E1)-1); }
+    for( 0; dim(E2) < 4; 0 ) { E2 = diminsert(E2, dim(E2)-1); }
+    
+    # Resample E2 to E1 location vectors
+    E2 = interp(E2, x2, y2, z2, [1,2,3], x1, y1, z1, [1,2,3]);
+    
+    # Field normalizations; broken out for readability
+    N1 = sum(integrate2(abs(E1)^2, [1, 2, 3], x1, y1, z1));
+    N2 = sum(integrate2(abs(E2)^2, [1, 2, 3], x1, y1, z1));
+    
+    # Field overlap
+    O = sum( abs( integrate2(conj(E1)*E2, [1, 2, 3], x1, y1, z1) )^2 );
+    
+    return O/(N1*N2);
+}
+
+# Helper non-datastructure 2D version
+function fieldOverlap2D(E1, x1, y1, E2, x2, y2) {
+    # Build datastructure from input
+    EM1 = rectilineardataset("EM fields", x1(:), y1(:), 0);
+    EM1.addattribute("E", E1);
+    EM2 = rectilineardataset("EM fields", x2(:), y2(:), 0);
+    EM2.addattribute("E", E2);
+    
+    return fieldOverlap(EM1,EM2);
+}
+
+# Helper non-datastructure 1D version
+function fieldOverlap1D(E1, x1, E2, x2) {
+    E1 = pinch(E1); E2 = pinch(E2);
+    
+    # Just pass to 2D version; it will expand dimensions as neccessary
+    return fieldOverlap2D(E1, x1, [0], E2, x2, [0]);
+}

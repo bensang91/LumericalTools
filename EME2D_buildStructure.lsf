@@ -1,0 +1,104 @@
+addpath('C:/Users/Michael Nickerson/Documents/IPL/Code/Lumerical/common');  # LABDESK
+addpath('/home/nickersonm/lumerical/common');   # Cluster
+addpath('E:/Nickerson/Lumerical/common');   # LABSIM
+util_fCommon;    # Load common functions
+
+### New EME simulation as reactive structure
+## Call from a new setup file based on 'EME2D_newStructure_template'
+## Builds a structure based on the file specified
+## 
+## Inputs as defined variables:
+# Required:
+#   contentScript: full path to calling script (or other script) to load as content
+
+
+
+## Set defaults if needed
+dVars = ''; dVals = ''; dRequired = 'contentScript';
+util_paramDefaults;
+if(~exist('customVars')) { customVars = ''; }
+
+
+## Build structure content
+
+# Read content file
+constructionScript = read(contentScript); clear(contentScript);
+
+# Remove calls to 'newproject' and 'clear'
+constructionScript = replacestring(constructionScript, 'clear;', '');
+constructionScript = replacestring(constructionScript, 'newproject;', '');
+
+# Remove calls to self/setup/etc
+lastPos = findstring(constructionScript, "## Set up this script as a new structure");
+constructionScript = substring(constructionScript,1,lastPos-2);
+clear(lastPos);
+
+# Build remaining construction script
+constructionScript = constructionScript + endl + "
+## Build
+EME2D_buildMaterial;
+EME2D_buildWGs;
+EME2D_buildSim;
+
+# Update resultant variables in construction/analysis scripts
+util_paramGetDefined;
+passVars = definedScalar + definedString + definedStruct;
+passTab = 'analysis';
+util_paramPass;       # Run pass function
+";
+
+
+
+## Initialize
+switchtolayout;
+select('::model'); deleteall;
+
+# Run initial build to define materials and default values, then reset
+EME2D_buildMaterial;
+EME2D_buildWGs;
+EME2D_buildSim;
+deleteall;
+
+
+## Pass relevant variables to structure definition
+# Pass default scalar and string values to be used as sweepable parameters
+passVars = simVars + ',' + customVars;
+passTab = 'construction';
+util_paramPass;
+
+
+## Set construction script and run
+setnamed('::model', 'setup script', constructionScript);
+
+# Run; in a try {} since subcomponents use try {}
+try { runsetup; } catch(errMsg);
+
+# Zooom extents
+selectGeom(); setview('extent');
+select('EME'); setview('extent');
+
+
+## Build analysis script
+analysisScript = "addpath('C:/Users/Michael Nickerson/Documents/IPL/Code/Lumerical/common');  # LABDESK
+addpath('/home/nickersonm/lumerical/common');   # Cluster
+addpath('E:/Nickerson/Lumerical/common');   # LABSIM
+
+util_paramRecover;  # Recover passed complex parameters
+
+
+## Analyze
+EME2D_analyze;
+
+# Optimization metric depends on reducing the length
+optMetric = 100*P12^2 / (100 + (lSSC)^0.5);
+
+";
+
+
+## Set analysis script and relevant results
+setnamed('::model', 'analysis script', analysisScript);
+select('::model');
+addanalysisresult('S12');
+addanalysisresult('S11');
+addanalysisresult('P12');
+addanalysisresult('Ptr');
